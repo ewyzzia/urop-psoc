@@ -42,6 +42,7 @@ openocd.tcl
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+.vscode-ctags
 # *.code-workspace
 
 # IAR Embedded Workbench files
@@ -151,3 +152,6 @@ Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
 [Dd]esktop.ini
+
+.ninja_log
+.cache/
