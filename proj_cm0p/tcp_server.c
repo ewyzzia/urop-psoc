@@ -214,19 +214,15 @@ void tcp_server_task(void *arg)
     /* Variable to receive LED ON/OFF command from the user button ISR. */
     uint32_t led_state_cmd = LED_OFF_CMD;
 
-    printf("heya!\n");
-
     /* Initialize the user button (CYBSP_USER_BTN) and register interrupt on falling edge. */
     cyhal_gpio_init(CYBSP_USER_BTN, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_PULLUP, CYBSP_BTN_OFF);
     cyhal_gpio_register_callback(CYBSP_USER_BTN, &cb_data);
-    cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL, USER_BTN_INTR_PRIORITY, true);
-
-    printf("2\n");
+    // uncommenting the below line causes the cm0+ to freeze up
+    // probably due to something, something, interrupt multiplexing on cm0+ 
+    //cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL, USER_BTN_INTR_PRIORITY, true);
 
     /* Initialize Wi-Fi connection manager. */
     result = cy_wcm_init(&wifi_config);
-
-    printf("3\n");
 
     if (result != CY_RSLT_SUCCESS)
     {

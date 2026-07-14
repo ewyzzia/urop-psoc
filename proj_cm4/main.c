@@ -143,14 +143,6 @@ int main(void)
         CY_ASSERT(0);
     }
     printf("i'm ALIVEEEE\r\n");
-    /* Initialize the User Button */
-    result = cyhal_gpio_init(CYBSP_USER_BTN, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_PULLUP, true);
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
-    cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL, CYHAL_ISR_PRIORITY_DEFAULT, true);
-    cyhal_gpio_register_callback(CYBSP_USER_BTN, &cb_data);
 
     /* Register the Message Callback */
     ipc_status = Cy_IPC_Pipe_RegisterCallback(USER_IPC_PIPE_EP_ADDR,
@@ -169,6 +161,7 @@ int main(void)
     ****************** \r\n\n");
 
     printf("<Press the User Button once to start random number generation, press again to stop>\r\n");
+    printf("Don't actually do that. It doesn't do anything anymore. Sorry. I'm so sorry\r\n");
 
     SEND_IPC_MSG(IPC_CMD_INIT);    
 }
