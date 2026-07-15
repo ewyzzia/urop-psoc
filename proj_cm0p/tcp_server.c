@@ -290,7 +290,7 @@ void tcp_server_task(void *arg)
         /* Disable the GPIO signal falling edge detection until the command is
          * sent to the TCP client.
          */
-        cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL, USER_BTN_INTR_PRIORITY, false);
+        //cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL, USER_BTN_INTR_PRIORITY, false);
 
         /* Wait till the debounce period of the user button. */
         cy_rtos_delay_milliseconds(DEBOUNCE_DELAY_MS);
@@ -331,7 +331,7 @@ void tcp_server_task(void *arg)
         }
 
         /* Enable the GPIO signal falling edge detection. */
-        cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL, USER_BTN_INTR_PRIORITY, true);
+        //cyhal_gpio_enable_event(CYBSP_USER_BTN, CYHAL_GPIO_IRQ_FALL, USER_BTN_INTR_PRIORITY, true);
     }
  }
 

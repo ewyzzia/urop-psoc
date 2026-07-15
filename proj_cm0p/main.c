@@ -2,19 +2,23 @@
 #include "cybsp.h"
 #include "cy_retarget_io.h"
 
+#include "cy_smif.h"
+
 #include "cyabs_rtos.h"
 #include <FreeRTOS.h>
 #include <task.h>
 
 #include "tcp_server.h"
 
-
 /*******************************************************************************
 * Macros
 ********************************************************************************/
 /* RTOS related macros for TCP server task. */
 #define TCP_SERVER_TASK_STACK_SIZE                (1024 * 5)
-#define TCP_SERVER_TASK_PRIORITY                  (1)
+#define TCP_SERVER_TASK_PRIORITY                  (2)
+
+#define QSPI_TASK_STACK_SIZE (1024 / sizeof(StackType_t)) // 1 kb
+#define QSPI_TASK_PRIORITY (1)
 
 /* Queue lengths of message queues used in this project */
 #define SINGLE_ELEMENT_QUEUE                      (1u)
@@ -28,9 +32,30 @@ cy_queue_t led_command_q;
 /* This enables RTOS aware debugging. */
 volatile int uxTopUsedPriority;
 
+cy_stc_smif_context_t smifContext;
+void SMIF_Interrupt_User(void)
+{
+    Cy_SMIF_Interrupt(SMIF0, &smifContext);
+}
+
+void qspi_task_test(void *arg) {
+    while (true) {
+        printf("hahahahaha i'm another task that's running!\r\n");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 int main()
 {
     cy_rslt_t result;
+
+
+    /* Main configuration parameters*/
+    #define NUMBER_OF_EXTERNAL_MEM      (2U)
+    #define SMIF_PRIORITY               (1U)
+    #define TIMEOUT_1_S                 (1000U)
+    #define DESELECT_DELAY              (7U)
+    #define SMIF_INTERRUPT smif_interrupt_IRQn
 
     /* This enables RTOS aware debugging in OpenOCD. */
     uxTopUsedPriority = configMAX_PRIORITIES - 1;
@@ -38,15 +63,51 @@ int main()
     result = cybsp_init() ;
     CY_ASSERT(result == CY_RSLT_SUCCESS) ;
 
-    /* Enable global interrupts. */
-    __enable_irq();
-
     // Redirect stdin and stdout to the debug UART port
     cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX,
         CY_RETARGET_IO_BAUDRATE);
 
+    cy_stc_sysint_t smifIntConfig =
+    {
+        .intrSrc = NvicMux7_IRQn,
+        .cm0pSrc = SMIF_INTERRUPT,
+        .intrPriority = SMIF_PRIORITY
+    };
+    (void) Cy_SysInt_Init(&smifIntConfig, SMIF_Interrupt_User);
+    __enable_irq();
+    NVIC_EnableIRQ(NvicMux7_IRQn);
+    
+    /* SMIF initialization */
+    Cy_SMIF_Init(SMIF0, &smif_0_config, TIMEOUT_1_S, &smifContext);
+    Cy_SMIF_Enable(SMIF0, &smifContext);
+
     /* \x1b[2J\x1b[;H - ANSI ESC sequence to clear screen. */
     printf("\x1b[2J\x1b[;H");
+    printf("SMIF enabled\r\n");
+
+    // try transmitting something
+    Cy_SysLib_Delay(1000);
+
+    printf("Aight we transmitting\r\n");
+
+    uint8_t param_buffer[4] = {0b11010010,0b11010010,0b11010010,0b11010010};
+    result = Cy_SMIF_TransmitCommand(SMIF0,
+        0b10101100,
+        CY_SMIF_WIDTH_SINGLE,
+        param_buffer,
+        sizeof(param_buffer),
+        CY_SMIF_WIDTH_SINGLE,
+        CY_SMIF_SLAVE_SELECT_2,
+        true,
+        &smifContext
+    );
+
+    if (result != CY_RSLT_SUCCESS) {
+        printf("Ruh roh...something went wrong\r\n");
+    }
+    
+    printf("Transmission transmitted! Wow\r\n");
+
     printf("===============================================================\n");
     printf("CE229153 - Connectivity Example: TCP Server\n");
     printf("===============================================================\n\n");
@@ -54,8 +115,11 @@ int main()
     /* Initialize a queue to receive command. */
     cy_rtos_queue_init(&led_command_q, SINGLE_ELEMENT_QUEUE, sizeof(uint8_t));
 
-    xTaskCreate(tcp_server_task, "Network task", TCP_SERVER_TASK_STACK_SIZE, NULL,
+    /*xTaskCreate(tcp_server_task, "Network task", TCP_SERVER_TASK_STACK_SIZE, NULL,
                TCP_SERVER_TASK_PRIORITY, NULL);
+
+    xTaskCreate(qspi_task_test, "FPGA communication task", QSPI_TASK_STACK_SIZE, NULL,
+        QSPI_TASK_PRIORITY, NULL);*/
 
     printf("Enabling CM4 at %x\n", CY_CORTEX_M4_APPL_ADDR);
     Cy_SysEnableCM4(CY_CORTEX_M4_APPL_ADDR);
