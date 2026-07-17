@@ -90,9 +90,8 @@ int main()
 
     printf("Aight we transmitting\r\n");
 
-    uint8_t tx_buf[] = {0xAA, 0xAA, 0xAA, 0xAA};
     result = Cy_SMIF_TransmitCommand(SMIF0,
-        0b11001010,
+        0xAF,
         CY_SMIF_WIDTH_QUAD,
         CY_SMIF_CMD_WITHOUT_PARAM,
         CY_SMIF_CMD_WITHOUT_PARAM,
@@ -106,14 +105,16 @@ int main()
         printf("Ruh roh...something went wrong 1\r\n");
     }
 
-    cy_en_smif_status_t smif_result = Cy_SMIF_TransmitData(
+    uint32_t rx_buf;
+    cy_en_smif_status_t smif_result = Cy_SMIF_ReceiveDataBlocking(
         SMIF0,
-        tx_buf,
-        sizeof(tx_buf),
+        (uint8_t*) &rx_buf,
+        sizeof(rx_buf),
         CY_SMIF_WIDTH_QUAD,
-        NULL,
         &smifContext
     );
+
+    printf("Got %08x from FPGA\r\n", rx_buf);
 
     if (smif_result != CY_SMIF_SUCCESS) {
         printf("Ruh roh...something went wrong 1\r\n");
