@@ -52,7 +52,7 @@ int main()
 
     /* Main configuration parameters*/
     #define NUMBER_OF_EXTERNAL_MEM      (2U)
-    #define SMIF_PRIORITY               (1U)
+    #define SMIF_PRIORITY               (2U)
     #define TIMEOUT_1_S                 (1000U)
     #define DESELECT_DELAY              (7U)
     #define SMIF_INTERRUPT smif_interrupt_IRQn
@@ -69,13 +69,13 @@ int main()
 
     cy_stc_sysint_t smifIntConfig =
     {
-        .intrSrc = NvicMux7_IRQn,
+        .intrSrc = NvicMux5_IRQn,
         .cm0pSrc = SMIF_INTERRUPT,
         .intrPriority = SMIF_PRIORITY
     };
     (void) Cy_SysInt_Init(&smifIntConfig, SMIF_Interrupt_User);
     __enable_irq();
-    NVIC_EnableIRQ(NvicMux7_IRQn);
+    NVIC_EnableIRQ(NvicMux5_IRQn);
     
     /* SMIF initialization */
     Cy_SMIF_Init(SMIF0, &smif_0_config, TIMEOUT_1_S, &smifContext);
@@ -90,20 +90,33 @@ int main()
 
     printf("Aight we transmitting\r\n");
 
-    uint8_t param_buffer[4] = {0b11010010,0b11010010,0b11010010,0b11010010};
+    uint8_t tx_buf[] = {0xAA, 0xAA, 0xAA, 0xAA};
     result = Cy_SMIF_TransmitCommand(SMIF0,
-        0b10101100,
-        CY_SMIF_WIDTH_SINGLE,
-        param_buffer,
-        sizeof(param_buffer),
-        CY_SMIF_WIDTH_SINGLE,
+        0b11001010,
+        CY_SMIF_WIDTH_QUAD,
+        CY_SMIF_CMD_WITHOUT_PARAM,
+        CY_SMIF_CMD_WITHOUT_PARAM,
+        CY_SMIF_WIDTH_QUAD,
         CY_SMIF_SLAVE_SELECT_2,
-        true,
+        false,
         &smifContext
     );
 
     if (result != CY_RSLT_SUCCESS) {
-        printf("Ruh roh...something went wrong\r\n");
+        printf("Ruh roh...something went wrong 1\r\n");
+    }
+
+    cy_en_smif_status_t smif_result = Cy_SMIF_TransmitData(
+        SMIF0,
+        tx_buf,
+        sizeof(tx_buf),
+        CY_SMIF_WIDTH_QUAD,
+        NULL,
+        &smifContext
+    );
+
+    if (smif_result != CY_SMIF_SUCCESS) {
+        printf("Ruh roh...something went wrong 1\r\n");
     }
     
     printf("Transmission transmitted! Wow\r\n");
@@ -112,7 +125,7 @@ int main()
     printf("CE229153 - Connectivity Example: TCP Server\n");
     printf("===============================================================\n\n");
 
-    /* Initialize a queue to receive command. */
+    // Initialize a queue to receive command.
     cy_rtos_queue_init(&led_command_q, SINGLE_ELEMENT_QUEUE, sizeof(uint8_t));
 
     /*xTaskCreate(tcp_server_task, "Network task", TCP_SERVER_TASK_STACK_SIZE, NULL,
@@ -126,7 +139,7 @@ int main()
 
     vTaskStartScheduler();
 
-    /* Should never get here. */
+    //Should never get here.
     CY_ASSERT(0);
 }
 
