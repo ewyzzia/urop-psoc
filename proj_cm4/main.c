@@ -64,7 +64,7 @@
 * Functions Prototypes
 *****************************************************************************/
 static void cm4_msg_callback(uint32_t *msg);
-static void button_isr_handler(void *arg, cyhal_gpio_event_t event);
+static void rx_dma_complete();
 
 /****************************************************************************
 * Global Variables
@@ -82,18 +82,13 @@ static volatile bool msg_flag = false;
 static volatile uint32_t msg_value;
 static volatile uint32_t button_flag;
 static volatile bool button_pressed = false;
+static volatile bool rx_dma_done = false;
 
 /* MCWDT Object [used by CM0+] */
 static cyhal_resource_inst_t mcwdt_0 =
 {
     .type = CYHAL_RSC_LPTIMER,
     .block_num = 0
-};
-
-static cyhal_gpio_callback_data_t cb_data =
-{
-    .callback = button_isr_handler,
-    .callback_arg = NULL
 };
 
 #define UART_INTR_NUM        (scb_6_interrupt_IRQn)
@@ -144,26 +139,20 @@ int main(void)
     }
     printf("i'm ALIVEEEE\r\n");
 
-    /* Register the Message Callback */
-    ipc_status = Cy_IPC_Pipe_RegisterCallback(USER_IPC_PIPE_EP_ADDR,
-                                 cm4_msg_callback,
-                                 IPC_CM0_TO_CM4_CLIENT_ID);   
-    if (ipc_status != CY_IPC_PIPE_SUCCESS)
+    const cy_stc_sysint_t intRxDma_cfg =
     {
-        CY_ASSERT(0);
+       .intrSrc      = rx_dma_IRQ,
+       .intrPriority = 3u
+    };
+
+    Cy_SysInt_Init(&intRxDma_cfg, (cy_israddress) &rx_dma_complete);
+    NVIC_EnableIRQ(intRxDma_cfg.intrSrc);
+
+    while (true) {
+        printf("Rx DMA done? %x\r\n", rx_dma_done);
+        Cy_SysLib_Delay(1000);
     }
 
-    /* \x1b[2J\x1b[;H - ANSI ESC sequence for clear screen */
-    printf("\x1b[2J\x1b[;H");
-
-    printf("****************** \
-    IPC Pipes Example \
-    ****************** \r\n\n");
-
-    printf("<Press the User Button once to start random number generation, press again to stop>\r\n");
-    printf("Don't actually do that. It doesn't do anything anymore. Sorry. I'm so sorry\r\n");
-
-    SEND_IPC_MSG(IPC_CMD_INIT);    
 }
 
 /*******************************************************************************
@@ -194,35 +183,13 @@ static void cm4_msg_callback(uint32_t *msg)
     
 }
 
-/*******************************************************************************
-* Function Name: button_isr_handler
-********************************************************************************
-* Summary:
-*  Button ISR handler. Set a flag to be processed in the main loop.
-*
-* Parameters:
-*  arg: not used
-*  event: event that occurred
-*
-*******************************************************************************/
-static void button_isr_handler(void *arg, cyhal_gpio_event_t event)
+void rx_dma_complete()
 {
-    (void) arg;
-
-    //printf("i'm the roaring knight!");
-
-    if(event & CYHAL_GPIO_IRQ_FALL)
-    {
-        if((button_flag == 0) || (button_flag == BTN_MSG_STOP))
-        {
-            button_flag = BTN_MSG_START;
-        }
-        else
-        {
-            button_flag = BTN_MSG_STOP;
-        }
+    rx_dma_done = true;
+    /* Scenario: Inside the interrupt service routine for block DW0 channel 23: */
+    if (CY_DMA_INTR_MASK == Cy_DMA_Channel_GetInterruptStatusMasked(rx_dma_HW, rx_dma_CHANNEL)) {
+        Cy_DMA_Channel_ClearInterrupt(rx_dma_HW, rx_dma_CHANNEL);
     }
-    button_pressed = true;
 }
 
 /* [] END OF FILE */

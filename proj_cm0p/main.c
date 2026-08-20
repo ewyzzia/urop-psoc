@@ -8,14 +8,16 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
-#include "tcp_server.h"
+#include "udp_server.h"
+#include "qspi_dma.h"
+#include "util.h"
 
 /*******************************************************************************
 * Macros
 ********************************************************************************/
 /* RTOS related macros for TCP server task. */
-#define TCP_SERVER_TASK_STACK_SIZE                (1024 * 5)
-#define TCP_SERVER_TASK_PRIORITY                  (2)
+#define UDP_SERVER_TASK_STACK_SIZE                (1024 * 5)
+#define UDP_SERVER_TASK_PRIORITY                  (2)
 
 #define QSPI_TASK_STACK_SIZE (1024 / sizeof(StackType_t)) // 1 kb
 #define QSPI_TASK_PRIORITY (1)
@@ -40,9 +42,15 @@ void SMIF_Interrupt_User(void)
 
 void qspi_task_test(void *arg) {
     while (true) {
-        printf("hahahahaha i'm another task that's running!\r\n");
+        PRINT("hahahahaha i'm another task that's running!\r\n");
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+}
+
+uint32_t read_primask() {
+    uint32_t primask_value;
+    asm volatile ("MRS %[output_reg], PRIMASK\n" : [output_reg] "=r" (primask_value));
+    return primask_value;
 }
 
 int main()
@@ -67,28 +75,36 @@ int main()
     cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX,
         CY_RETARGET_IO_BAUDRATE);
 
+    //PRINT("Enabling CM4 at %x\n", CY_CORTEX_M4_APPL_ADDR);
+    //Cy_SysEnableCM4(CY_CORTEX_M4_APPL_ADDR);
+
+    PRINT("------------------\r\n");
+
     cy_stc_sysint_t smifIntConfig =
     {
         .intrSrc = NvicMux5_IRQn,
         .cm0pSrc = SMIF_INTERRUPT,
         .intrPriority = SMIF_PRIORITY
     };
-    (void) Cy_SysInt_Init(&smifIntConfig, SMIF_Interrupt_User);
+    //(void) Cy_SysInt_Init(&smifIntConfig, SMIF_Interrupt_User);
+
+    volatile uint32_t rx_buf = 0x88889999;
+    configure_rx_dma(&rx_buf);
+    
     __enable_irq();
-    NVIC_EnableIRQ(NvicMux5_IRQn);
+
+    //NVIC_EnableIRQ(NvicMux5_IRQn);
     
     /* SMIF initialization */
     Cy_SMIF_Init(SMIF0, &smif_0_config, TIMEOUT_1_S, &smifContext);
+    Cy_SMIF_SetRxFifoTriggerLevel(SMIF0, 3);
     Cy_SMIF_Enable(SMIF0, &smifContext);
 
     /* \x1b[2J\x1b[;H - ANSI ESC sequence to clear screen. */
-    printf("\x1b[2J\x1b[;H");
-    printf("SMIF enabled\r\n");
+    PRINT("SMIF enabled\r\n");
 
     // try transmitting something
-    Cy_SysLib_Delay(1000);
-
-    printf("Aight we transmitting\r\n");
+    PRINT("Aight we transmitting\r\n");
 
     result = Cy_SMIF_TransmitCommand(SMIF0,
         0xAF,
@@ -101,42 +117,35 @@ int main()
         &smifContext
     );
 
-    if (result != CY_RSLT_SUCCESS) {
-        printf("Ruh roh...something went wrong 1\r\n");
-    }
-
-    uint32_t rx_buf;
-    cy_en_smif_status_t smif_result = Cy_SMIF_ReceiveDataBlocking(
+    cy_en_smif_status_t smif_result = Cy_SMIF_ReceiveData(
         SMIF0,
-        (uint8_t*) &rx_buf,
+        NULL, // receiving is handled via DMA
         sizeof(rx_buf),
         CY_SMIF_WIDTH_QUAD,
+        NULL,
         &smifContext
     );
 
-    printf("Got %08x from FPGA\r\n", rx_buf);
+    while (!rx_dma_done) {}
+    PRINT("Got %08x from FPGA\r\n", rx_buf);
 
     if (smif_result != CY_SMIF_SUCCESS) {
-        printf("Ruh roh...something went wrong 1\r\n");
+        PRINT("Ruh roh...something went wrong 1\r\n");
     }
-    
-    printf("Transmission transmitted! Wow\r\n");
+    PRINT("Transmission transmitted! Wow\r\n");
 
-    printf("===============================================================\n");
-    printf("CE229153 - Connectivity Example: TCP Server\n");
-    printf("===============================================================\n\n");
+    PRINT("===============================================================\n");
+    PRINT("CE229153 - Connectivity Example: TCP Server\n");
+    PRINT("===============================================================\n\n");
 
     // Initialize a queue to receive command.
     cy_rtos_queue_init(&led_command_q, SINGLE_ELEMENT_QUEUE, sizeof(uint8_t));
 
-    /*xTaskCreate(tcp_server_task, "Network task", TCP_SERVER_TASK_STACK_SIZE, NULL,
-               TCP_SERVER_TASK_PRIORITY, NULL);
+    xTaskCreate(udp_server_task, "Network task", UDP_SERVER_TASK_STACK_SIZE, NULL,
+               UDP_SERVER_TASK_PRIORITY, NULL);
 
-    xTaskCreate(qspi_task_test, "FPGA communication task", QSPI_TASK_STACK_SIZE, NULL,
+    /*xTaskCreate(qspi_task_test, "FPGA communication task", QSPI_TASK_STACK_SIZE, NULL,
         QSPI_TASK_PRIORITY, NULL);*/
-
-    printf("Enabling CM4 at %x\n", CY_CORTEX_M4_APPL_ADDR);
-    Cy_SysEnableCM4(CY_CORTEX_M4_APPL_ADDR);
 
     vTaskStartScheduler();
 
