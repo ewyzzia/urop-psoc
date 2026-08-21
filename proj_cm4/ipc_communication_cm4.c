@@ -1,5 +1,5 @@
 /******************************************************************************
-* File Name:   ipc_communication_cm0p.c
+* File Name:   ipc_communication_cm4.c
 *
 * Description: This file contains function definitions for setting up system
 *              IPC communication and user IPC pipe.
@@ -55,7 +55,7 @@
 
 
 /*******************************************************************************
-* Function Name: setup_ipc_communication_cm0
+* Function Name: setup_ipc_communication_cm4
 ********************************************************************************
 * Summary:
 *        - Initializes IPC Semaphore.
@@ -66,13 +66,19 @@
 *        - Initializes flash after CY_PIPE is initialized.
 *
 *******************************************************************************/
-void setup_ipc_communication_cm0(void)
+void setup_ipc_communication_cm4(void)
 {
-     /* Allocate and initialize semaphores for the system operations. */
-    CY_SECTION(".cy_sharedmem")
-    static uint32_t ipcSemaArray[CY_IPC_SEMA_COUNT / CY_IPC_SEMA_PER_WORD];
-
-    (void) Cy_IPC_Sema_Init(CY_IPC_CHAN_SEMA, CY_IPC_SEMA_COUNT, ipcSemaArray);
+    #ifdef __CM0P_PRESENT
+    #if (__CM0P_PRESENT == 0)
+        /* Allocate and initialize semaphores for the system operations. */
+        static uint32_t ipcSemaArray[CY_IPC_SEMA_COUNT / CY_IPC_SEMA_PER_WORD];
+        (void) Cy_IPC_Sema_Init(CY_IPC_CHAN_SEMA, CY_IPC_SEMA_COUNT, ipcSemaArray);
+    #else
+        (void) Cy_IPC_Sema_Init(CY_IPC_CHAN_SEMA, 0ul, NULL);
+    #endif /* (__CM0P_PRESENT) */
+#else
+    (void) Cy_IPC_Sema_Init(CY_IPC_CHAN_SEMA, 0ul, NULL);
+#endif /* __CM0P_PRESENT */
 
     /* Create an array of endpoint structures */
     static cy_stc_ipc_pipe_ep_t systemIpcPipeEpArray[CY_IPC_MAX_ENDPOINTS];
@@ -81,32 +87,32 @@ void setup_ipc_communication_cm0(void)
 
     static cy_ipc_pipe_callback_ptr_t systemIpcPipeSysCbArray[CY_SYS_CYPIPE_CLIENT_CNT];
 
-    static const cy_stc_ipc_pipe_config_t systemIpcPipeConfigCm0 =
+    static const cy_stc_ipc_pipe_config_t systemIpcPipeConfigCm4 =
     {
     /* .ep0ConfigData */
         {
-            CY_IPC_INTR_CYPIPE_EP0,       /* .ipcNotifierNumber    */
-            CY_SYS_INTR_CYPIPE_PRIOR_EP0, /* .ipcNotifierPriority  */
-            CY_SYS_INTR_CYPIPE_MUX_EP0,   /* .ipcNotifierMuxNumber */
-            CY_IPC_EP_CYPIPE_CM0_ADDR,    /* .epAddress            */
-            CY_SYS_CYPIPE_CONFIG_EP0      /* .epConfig             */
+            CY_IPC_INTR_CYPIPE_EP0,         /* .ipcNotifierNumber    */  
+            CY_SYS_INTR_CYPIPE_PRIOR_EP0,   /* .ipcNotifierPriority  */  
+            CY_SYS_INTR_CYPIPE_MUX_EP0,     /* .ipcNotifierMuxNumber */  
+            CY_IPC_EP_CYPIPE_CM0_ADDR,      /* .epAddress            */  
+            CY_SYS_CYPIPE_CONFIG_EP0        /* .epConfig             */  
         },
     /* .ep1ConfigData */
         {
-            CY_IPC_INTR_CYPIPE_EP1,       /* .ipcNotifierNumber    */
-            CY_SYS_INTR_CYPIPE_PRIOR_EP1, /* .ipcNotifierPriority  */
-            0u,                           /* .ipcNotifierMuxNumber */
-            CY_IPC_EP_CYPIPE_CM4_ADDR,    /* .epAddress            */
-            CY_SYS_CYPIPE_CONFIG_EP1      /* .epConfig             */
+            CY_IPC_INTR_CYPIPE_EP1,         /* .ipcNotifierNumber    */
+            CY_SYS_INTR_CYPIPE_PRIOR_EP1,   /* .ipcNotifierPriority  */
+            0u,                             /* .ipcNotifierMuxNumber */
+            CY_IPC_EP_CYPIPE_CM4_ADDR,      /* .epAddress            */
+            CY_SYS_CYPIPE_CONFIG_EP1        /* .epConfig             */
         },
-      CY_SYS_CYPIPE_CLIENT_CNT,           /* .endpointClientsCount     */ 
-      systemIpcPipeSysCbArray,            /* .endpointsCallbacksArray  */ 
-      &Cy_SysIpcPipeIsrCm0                /* .userPipeIsrHandler       */
+        CY_SYS_CYPIPE_CLIENT_CNT,           /* .endpointClientsCount     */   
+        systemIpcPipeSysCbArray,            /* .endpointsCallbacksArray  */   
+        &Cy_SysIpcPipeIsrCm4                /* .userPipeIsrHandler       */  
     };
 
     static cy_ipc_pipe_callback_ptr_t user_ipc_pipe_cb_array[USER_IPC_PIPE_CLIENT_CNT];
 
-    static const cy_stc_ipc_pipe_config_t user_ipc_pipe_config_cm0 =
+    static const cy_stc_ipc_pipe_config_t user_ipc_pipe_config_cm4 =
     {
         /* .ep2ConfigData */
         {
@@ -125,41 +131,36 @@ void setup_ipc_communication_cm0(void)
             USER_IPC_PIPE_EP1_CONFIG       /* .epConfig                */
         },
         USER_IPC_PIPE_CLIENT_CNT,          /* .endpointClientsCount     */  
-        user_ipc_pipe_cb_array,            /* .endpointsCallbacksArray  */  
-        &user_ipc_pipe_isr_cm0             /* .userPipeIsrHandler       */  
+        user_ipc_pipe_cb_array,           /* .endpointsCallbacksArray  */  
+        &user_ipc_pipe_isr_cm4               /* .userPipeIsrHandler       */  
     };
 
-    Cy_IPC_Pipe_Init(&systemIpcPipeConfigCm0);
-
-#if defined(CY_DEVICE_PSOC6ABLE2)
-    Cy_Flash_Init();
-#endif /* defined(CY_DEVICE_PSOC6ABLE2) */
-
-    Cy_IPC_Pipe_Init(&user_ipc_pipe_config_cm0);
+    Cy_IPC_Pipe_Init(&systemIpcPipeConfigCm4);
+    Cy_IPC_Pipe_Init(&user_ipc_pipe_config_cm4);
 }
 
 
 /*******************************************************************************
-* Function Name: Cy_SysIpcPipeIsrCm0
-********************************************************************************
-* Summary: User IRQ handler function that is called when IPC receives data from
-*          CM4 to CM0+ through USER_PIPE.
+* Function Name: Cy_SysIpcPipeIsrCm4
+****************************************************************************//**
 *
-*******************************************************************************/
-void Cy_SysIpcPipeIsrCm0(void)
-{
-    Cy_IPC_Pipe_ExecuteCallback(CY_IPC_EP_CYPIPE_CM0_ADDR);
-}
-
-
-/*******************************************************************************
-* Function Name: user_ipc_pipe_isr_cm0
-********************************************************************************
 * This is the interrupt service routine for the system pipe.
 *
 *******************************************************************************/
-void user_ipc_pipe_isr_cm0(void)
+void Cy_SysIpcPipeIsrCm4(void)
+{
+    Cy_IPC_Pipe_ExecuteCallback(CY_IPC_EP_CYPIPE_CM4_ADDR);
+}
+
+
+/*******************************************************************************
+* Function Name: user_ipc_pipe_isr_cm4
+********************************************************************************
+* Summary: User IRQ handler function that is called when IPC receives data from
+*          CM0+ to CM4 through USER_PIPE.
+*
+*******************************************************************************/
+void user_ipc_pipe_isr_cm4(void)
 {
     Cy_IPC_Pipe_ExecuteCallback(USER_IPC_PIPE_EP_ADDR);
 }
-

@@ -52,37 +52,27 @@
 /****************************************************************************
 * Constants
 *****************************************************************************/
-#define BTN_MSG_START   1u
-#define BTN_MSG_STOP    2u
-
-#define SEND_IPC_MSG(x) ipc_msg.cmd = x; \
-                        Cy_IPC_Pipe_SendMessage(USER_IPC_PIPE_EP_ADDR_CM0, \
-                                                USER_IPC_PIPE_EP_ADDR_CM4, \
-                                                (void *) &ipc_msg, 0);     
 
 /****************************************************************************
 * Functions Prototypes
 *****************************************************************************/
 static void cm4_msg_callback(uint32_t *msg);
-static void rx_dma_complete();
 
 /****************************************************************************
 * Global Variables
 *****************************************************************************/
 /* IPC structure to be sent to CM0+ */
+static uint32_t ipc_data_prefill_buf[IPC_DATA_LENGTH] = {};
 static ipc_msg_t ipc_msg = {
     .client_id  = IPC_CM4_TO_CM0_CLIENT_ID,
     .cpu_status = 0,
     .intr_mask  = USER_IPC_PIPE_INTR_MASK,
-    .cmd        = IPC_CMD_INIT,
+    .data        = {},
 };
 
 /* Message variables */
 static volatile bool msg_flag = false;
 static volatile uint32_t msg_value;
-static volatile uint32_t button_flag;
-static volatile bool button_pressed = false;
-static volatile bool rx_dma_done = false;
 
 /* MCWDT Object [used by CM0+] */
 static cyhal_resource_inst_t mcwdt_0 =
@@ -90,106 +80,58 @@ static cyhal_resource_inst_t mcwdt_0 =
     .type = CYHAL_RSC_LPTIMER,
     .block_num = 0
 };
-
-#define UART_INTR_NUM        (scb_6_interrupt_IRQn)
-#define UART_INTR_PRIORITY   (7U)
-cy_stc_scb_uart_context_t uartContext;
-const cy_stc_sysint_t uartIntrConfig = {
-    .intrSrc = UART_INTR_NUM,
-    .intrPriority = UART_INTR_PRIORITY          // Priority level (1 - 3)
-};
-void UART_Isr(void)
-{
-    Cy_SCB_UART_Interrupt(SCB6, &uartContext);
-}
-
-#ifdef COMPONENT_MW_MTB_HAL_CAT1
-#endif
     
 int main(void)
 {
     cy_rslt_t result;
     cy_en_ipc_pipe_status_t ipc_status;
 
-    /* Init the IPC communication for CM4 */
     setup_ipc_communication_cm4();
-
-    /* Initialize the device and board peripherals */
-    result = cybsp_init() ;
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);   
-    }
-
+    cybsp_init();
     /* Reserve the MCWDT used by the CM0+ to avoid conflicts if a LPTIMER is 
        to be added in the CM4 */
-    result = cyhal_hwmgr_reserve(&mcwdt_0);
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
-
-    /* Enable global interrupts */
+    cyhal_hwmgr_reserve(&mcwdt_0);
     __enable_irq();
+    cy_retarget_io_init(P12_1, P12_0, CY_RETARGET_IO_BAUDRATE);
 
-    result = cy_retarget_io_init(P12_1, P12_0, CY_RETARGET_IO_BAUDRATE);
-    if (result != CY_RSLT_SUCCESS)
-    {
-        CY_ASSERT(0);
-    }
-    printf("i'm ALIVEEEE\r\n");
+    Cy_IPC_Pipe_RegisterCallback(USER_IPC_PIPE_EP_ADDR,
+        cm4_msg_callback,
+        IPC_CM0_TO_CM4_CLIENT_ID);
 
-    const cy_stc_sysint_t intRxDma_cfg =
-    {
-       .intrSrc      = rx_dma_IRQ,
-       .intrPriority = 3u
-    };
+    printf("Hey guys!!!!!!\r\n");
 
-    Cy_SysInt_Init(&intRxDma_cfg, (cy_israddress) &rx_dma_complete);
-    NVIC_EnableIRQ(intRxDma_cfg.intrSrc);
+    printf("\x1b[2J\x1b[;H"); // clear screen
+
+    uint32_t count = 0;
+    uint32_t buf_idx = 0;
 
     while (true) {
-        printf("Rx DMA done? %x\r\n", rx_dma_done);
-        Cy_SysLib_Delay(1000);
+        ipc_data_prefill_buf[buf_idx] = count;
+        buf_idx++;
+        if (buf_idx == IPC_DATA_LENGTH) {
+            memcpy(ipc_msg.data, ipc_data_prefill_buf, sizeof(ipc_data_prefill_buf));
+            
+            Cy_IPC_Pipe_SendMessage(USER_IPC_PIPE_EP_ADDR_CM0, \
+                USER_IPC_PIPE_EP_ADDR_CM4, \
+                (void *) &ipc_msg, 0);   
+            buf_idx = 0;
+            //printf("sent\r\n");
+        }
+        count++;
+        Cy_SysLib_DelayUs(40);
     }
 
 }
 
-/*******************************************************************************
-* Function Name: cm4_msg_callback
-********************************************************************************
-* Summary:
-*   Callback function to execute when receiving a message from CM0+ to CM4.
-*
-* Parameters:
-*   msg: message received
-*
-*******************************************************************************/
 static void cm4_msg_callback(uint32_t *msg)
 {
     ipc_msg_t *ipc_recv_msg;
-
     if (msg != NULL)
     {
-        /* Cast received message to the IPC message structure */
         ipc_recv_msg = (ipc_msg_t *) msg;
-
-        /* Extract the message value */
-        msg_value = ipc_recv_msg->value;
-
-        /* Set message flag */
+        //msg_value = ipc_recv_msg->value;
         msg_flag = true;
     }
     
 }
 
-void rx_dma_complete()
-{
-    rx_dma_done = true;
-    /* Scenario: Inside the interrupt service routine for block DW0 channel 23: */
-    if (CY_DMA_INTR_MASK == Cy_DMA_Channel_GetInterruptStatusMasked(rx_dma_HW, rx_dma_CHANNEL)) {
-        Cy_DMA_Channel_ClearInterrupt(rx_dma_HW, rx_dma_CHANNEL);
-    }
-}
-
-/* [] END OF FILE */

@@ -79,7 +79,8 @@
 #define USER_IPC_PIPE_INTR_EP1          (9UL)
 
 /* CM0+ NVIC MUX for IPC */
-#define USER_IPC_PIPE_INTR_MUX_EP0      (2UL)
+// mux 2 is used by the SDHC driver
+#define USER_IPC_PIPE_INTR_MUX_EP0      (3UL)
 
 #define USER_IPC_PIPE_INTR_MASK         (uint32_t)((1UL << USER_IPC_PIPE_CHAN_EP0) |\
                                                  (1UL << USER_IPC_PIPE_CHAN_EP1))
@@ -101,15 +102,21 @@
 /*******************************************************************************
 * Enumerations
 *******************************************************************************/
+
+#define IPC_DATA_LENGTH 512
+#define RING_BUF_ENTRIES 10
 typedef struct __attribute__((packed, aligned(4)))
 {
     uint8_t     client_id;
     uint8_t     cpu_status;
     uint16_t    intr_mask;
-    uint8_t     cmd;
-    uint32_t    value;
+    uint32_t    data[IPC_DATA_LENGTH];
 } ipc_msg_t ;
 
+//typedef struct {
+//    uint32_t current_entry_ptr;
+//    uint32_t data[IPC_DATA_LENGTH][RING_BUF_ENTRIES];
+//} motor_data_ring_buf_t;
 
 /*******************************************************************************
 * Function prototypes
@@ -118,7 +125,6 @@ void setup_ipc_communication_cm0(void);
 void user_ipc_pipe_isr_cm0(void);
 void setup_ipc_communication_cm4(void);
 void user_ipc_pipe_isr_cm4(void);
-
 
 #endif /* SOURCE_IPC_COMMUNICATION_H */
 

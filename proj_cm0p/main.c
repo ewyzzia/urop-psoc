@@ -12,11 +12,13 @@
 #include "qspi_dma.h"
 #include "util.h"
 
+#include "ipc_communication.h"
+
 /*******************************************************************************
 * Macros
 ********************************************************************************/
 /* RTOS related macros for TCP server task. */
-#define UDP_SERVER_TASK_STACK_SIZE                (1024 * 5)
+#define UDP_SERVER_TASK_STACK_SIZE                (1024 * 5 / sizeof(StackType_t))
 #define UDP_SERVER_TASK_PRIORITY                  (2)
 
 #define QSPI_TASK_STACK_SIZE (1024 / sizeof(StackType_t)) // 1 kb
@@ -24,6 +26,13 @@
 
 /* Queue lengths of message queues used in this project */
 #define SINGLE_ELEMENT_QUEUE                      (1u)
+
+static volatile ipc_msg_t motor_data_msg = {
+    .client_id  = IPC_CM4_TO_CM0_CLIENT_ID,
+    .cpu_status = 0,
+    .intr_mask  = USER_IPC_PIPE_INTR_MASK,
+    .data       = {}
+};
 
 /********************************************************************************
 * Global Variables
@@ -47,11 +56,10 @@ void qspi_task_test(void *arg) {
     }
 }
 
-uint32_t read_primask() {
-    uint32_t primask_value;
-    asm volatile ("MRS %[output_reg], PRIMASK\n" : [output_reg] "=r" (primask_value));
-    return primask_value;
-}
+void cm0_msg_callback();
+volatile bool msg_flag = false;
+
+TaskHandle_t udp_server_task_handle = NULL;
 
 int main()
 {
@@ -68,17 +76,20 @@ int main()
     /* This enables RTOS aware debugging in OpenOCD. */
     uxTopUsedPriority = configMAX_PRIORITIES - 1;
 
+    setup_ipc_communication_cm0();
     result = cybsp_init() ;
-    CY_ASSERT(result == CY_RSLT_SUCCESS) ;
+    CY_ASSERT(result == CY_RSLT_SUCCESS);
+    __enable_irq();
+
+    
 
     // Redirect stdin and stdout to the debug UART port
     cy_retarget_io_init(CYBSP_DEBUG_UART_TX, CYBSP_DEBUG_UART_RX,
         CY_RETARGET_IO_BAUDRATE);
 
-    //PRINT("Enabling CM4 at %x\n", CY_CORTEX_M4_APPL_ADDR);
-    //Cy_SysEnableCM4(CY_CORTEX_M4_APPL_ADDR);
+    fflush(stdout);
 
-    PRINT("------------------\r\n");
+    PRINT("-------------------\r\n");
 
     cy_stc_sysint_t smifIntConfig =
     {
@@ -90,8 +101,6 @@ int main()
 
     volatile uint32_t rx_buf = 0x88889999;
     configure_rx_dma(&rx_buf);
-    
-    __enable_irq();
 
     //NVIC_EnableIRQ(NvicMux5_IRQn);
     
@@ -126,6 +135,7 @@ int main()
         &smifContext
     );
 
+
     while (!rx_dma_done) {}
     PRINT("Got %08x from FPGA\r\n", rx_buf);
 
@@ -138,11 +148,17 @@ int main()
     PRINT("CE229153 - Connectivity Example: TCP Server\n");
     PRINT("===============================================================\n\n");
 
-    // Initialize a queue to receive command.
-    cy_rtos_queue_init(&led_command_q, SINGLE_ELEMENT_QUEUE, sizeof(uint8_t));
 
-    xTaskCreate(udp_server_task, "Network task", UDP_SERVER_TASK_STACK_SIZE, NULL,
-               UDP_SERVER_TASK_PRIORITY, NULL);
+    PRINT("Enabling CM4 at %x\n", CY_CORTEX_M4_APPL_ADDR);
+    Cy_SysEnableCM4(CY_CORTEX_M4_APPL_ADDR);
+
+    xTaskCreate(udp_server_task, "Network task", UDP_SERVER_TASK_STACK_SIZE, &motor_data_msg,
+               UDP_SERVER_TASK_PRIORITY, &udp_server_task_handle);
+
+    // IPC communication
+    Cy_IPC_Pipe_RegisterCallback(USER_IPC_PIPE_EP_ADDR,
+        &cm0_msg_callback,
+        IPC_CM4_TO_CM0_CLIENT_ID);
 
     /*xTaskCreate(qspi_task_test, "FPGA communication task", QSPI_TASK_STACK_SIZE, NULL,
         QSPI_TASK_PRIORITY, NULL);*/
@@ -150,7 +166,8 @@ int main()
     vTaskStartScheduler();
 
     //Should never get here.
-    CY_ASSERT(0);
+    __enable_irq();
+    while (true) {}
 }
 
 /*
@@ -163,5 +180,21 @@ cy_rslt_t cybsp_register_custom_sysclk_pm_callback(void)
 
     return result;
 }
+
+void cm0_msg_callback(uint32_t *msg) {
+
+    // DO NOT BLOCK IN THIS CALLBACK IT BREAKS EVERYTHING
+
+    //PRINT("got\r\n");
+    ipc_msg_t *ipc_recv_msg;
+    if (msg != NULL)
+    {
+        ipc_recv_msg = (ipc_msg_t *) msg;
+        memcpy(motor_data_msg.data, ipc_recv_msg->data, sizeof(motor_data_msg.data));
+        vTaskResume(udp_server_task_handle);
+    }
+    
+}
+
 
  /* [] END OF FILE */

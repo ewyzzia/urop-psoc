@@ -102,8 +102,9 @@ bool client_connected;
 extern cy_queue_t led_command_q;
 
 
-void udp_server_task(void *arg)
+void udp_server_task(void *motor_data_msg_addr)
 {
+    ipc_msg_t *motor_data_msg = (ipc_msg_t*) motor_data_msg_addr;
     cy_rslt_t result;
 
     cy_wcm_config_t wifi_config = { .interface = WIFI_INTERFACE_TYPE };
@@ -136,42 +137,26 @@ void udp_server_task(void *arg)
         CY_ASSERT(0);
     }
 
-    char tx_buffer[1024] = { [0 ... 1023] = 0xAF};
-    uint32_t total_bytes_sent = 0;
-
-    char rx_buffer[6] = "boooo\0";
-
+    uint32_t my_buf[IPC_DATA_LENGTH] = {}; 
+    
     while(true) {
 
-        uint32_t bytes_received = 0;
         uint32_t broadcast_addr_size = sizeof(broadcast_address);
-        while (strcmp(rx_buffer, "START\0") != 0) {
-            result = cy_socket_recvfrom(server_handle, rx_buffer, sizeof(rx_buffer),
-                CY_SOCKET_FLAGS_NONE, &broadcast_address, &broadcast_addr_size, &bytes_received);
-            if (result != CY_RSLT_SUCCESS) {
-                PRINT("Receive failed\r\n");
-                PRINT("Error code: %x\r\n", result);
-            }
-            PRINT("%s\r\n", rx_buffer);
+        vTaskSuspend(NULL);
+
+        memcpy(my_buf, motor_data_msg->data, sizeof(my_buf));
+        //PRINT("count: %08x\r\n", my_buf[0]);
+        result = cy_socket_sendto(server_handle, my_buf, sizeof(my_buf),
+            CY_SOCKET_FLAGS_NONE,
+            &broadcast_address, sizeof(cy_socket_sockaddr_t), &bytes_sent);
+
+        if (result != CY_RSLT_SUCCESS) {
+            PRINT("Gulp..that wasn't suposed to happen!\r\n");
+            PRINT("Error code: %x\r\n", result);
+            cy_rtos_delay_milliseconds(1000);
         }
 
-        // 20 mib
-        while (total_bytes_sent < 1024 * 1024 * 20) {
-            bool is_last_byte = total_bytes_sent + 1024 >= 1024 * 1024 * 20;
-            result = cy_socket_sendto(server_handle, tx_buffer, strlen(tx_buffer),
-                is_last_byte ? CY_SOCKET_FLAGS_MORE : CY_SOCKET_FLAGS_NONE,
-                &broadcast_address, sizeof(cy_socket_sockaddr_t), &bytes_sent);
-            if (result != CY_RSLT_SUCCESS) {
-                PRINT("Gulp..that wasn't suposed to happen!\r\n");
-                PRINT("Error code: %x\r\n", result);
-                cy_rtos_delay_milliseconds(1000);
-            }
-            total_bytes_sent += bytes_sent;
-        }
 
-        PRINT("sent %d bytes\r\n", total_bytes_sent);
-        total_bytes_sent = 0;
-        memcpy(rx_buffer, "boooo\0", sizeof(rx_buffer));
     }
 }
 
