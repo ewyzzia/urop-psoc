@@ -18,9 +18,6 @@ GeneratedSource/
 *.lock
 .mtbqueryapi
 
-# ModusToolbox BSP files. Any custom BSP file is shipped within the 'templates' folder
-bsps/
-
 # ModusToolbox build system output
 build/
 Debug/
