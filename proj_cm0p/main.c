@@ -27,12 +27,7 @@
 /* Queue lengths of message queues used in this project */
 #define SINGLE_ELEMENT_QUEUE                      (1u)
 
-static volatile ipc_msg_t motor_data_msg = {
-    .client_id  = IPC_CM4_TO_CM0_CLIENT_ID,
-    .cpu_status = 0,
-    .intr_mask  = USER_IPC_PIPE_INTR_MASK,
-    .data       = {}
-};
+static volatile motor_data_ring_buf_t motor_data_ring_buf = {};
 
 /********************************************************************************
 * Global Variables
@@ -152,7 +147,7 @@ int main()
     PRINT("Enabling CM4 at %x\n", CY_CORTEX_M4_APPL_ADDR);
     Cy_SysEnableCM4(CY_CORTEX_M4_APPL_ADDR);
 
-    xTaskCreate(udp_server_task, "Network task", UDP_SERVER_TASK_STACK_SIZE, &motor_data_msg,
+    xTaskCreate(udp_server_task, "Network task", UDP_SERVER_TASK_STACK_SIZE, &motor_data_ring_buf,
                UDP_SERVER_TASK_PRIORITY, &udp_server_task_handle);
 
     // IPC communication
@@ -190,7 +185,15 @@ void cm0_msg_callback(uint32_t *msg) {
     if (msg != NULL)
     {
         ipc_recv_msg = (ipc_msg_t *) msg;
-        memcpy(motor_data_msg.data, ipc_recv_msg->data, sizeof(motor_data_msg.data));
+        motor_data_ring_buf.current_entry_ptr++;
+        if (motor_data_ring_buf.current_entry_ptr == RING_BUF_ENTRIES) {
+            motor_data_ring_buf.current_entry_ptr = 0;
+        }
+        memcpy(
+            motor_data_ring_buf.data[motor_data_ring_buf.current_entry_ptr],
+            ipc_recv_msg->data,
+            sizeof(motor_data_ring_buf.data[0])
+        );
         vTaskResume(udp_server_task_handle);
     }
     

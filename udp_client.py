@@ -22,7 +22,7 @@ if __name__ == "__main__":
     try:
         while True:
             bytes_received = []
-            for i in range(1, 100):
+            for i in range(1, 25):
                 data = my_socket.recv(16384)
                 bytes_received.extend(data)
             sorted_list = []

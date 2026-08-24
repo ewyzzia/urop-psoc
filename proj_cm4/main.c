@@ -118,7 +118,7 @@ int main(void)
             //printf("sent\r\n");
         }
         count++;
-        Cy_SysLib_DelayUs(40);
+        Cy_SysLib_DelayUs(160);
     }
 
 }

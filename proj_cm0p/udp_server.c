@@ -102,9 +102,9 @@ bool client_connected;
 extern cy_queue_t led_command_q;
 
 
-void udp_server_task(void *motor_data_msg_addr)
+void udp_server_task(void *motor_data_ring_buf_ptr)
 {
-    ipc_msg_t *motor_data_msg = (ipc_msg_t*) motor_data_msg_addr;
+    motor_data_ring_buf_t *motor_data_ring_buf = (motor_data_ring_buf_t*) motor_data_ring_buf_ptr;
     cy_rslt_t result;
 
     cy_wcm_config_t wifi_config = { .interface = WIFI_INTERFACE_TYPE };
@@ -138,22 +138,28 @@ void udp_server_task(void *motor_data_msg_addr)
     }
 
     uint32_t my_buf[IPC_DATA_LENGTH] = {}; 
-    
+    uint32_t current_entry_ptr = 0;
+
     while(true) {
 
         uint32_t broadcast_addr_size = sizeof(broadcast_address);
         vTaskSuspend(NULL);
 
-        memcpy(my_buf, motor_data_msg->data, sizeof(my_buf));
-        //PRINT("count: %08x\r\n", my_buf[0]);
-        result = cy_socket_sendto(server_handle, my_buf, sizeof(my_buf),
-            CY_SOCKET_FLAGS_NONE,
-            &broadcast_address, sizeof(cy_socket_sockaddr_t), &bytes_sent);
+        while (current_entry_ptr != motor_data_ring_buf->current_entry_ptr) {
+            current_entry_ptr++;
+            if (current_entry_ptr == RING_BUF_ENTRIES) {
+                current_entry_ptr = 0;
+            }
+            memcpy(my_buf, motor_data_ring_buf->data[current_entry_ptr], sizeof(my_buf));
+            result = cy_socket_sendto(server_handle, my_buf, sizeof(my_buf),
+                CY_SOCKET_FLAGS_NONE,
+                &broadcast_address, sizeof(cy_socket_sockaddr_t), &bytes_sent);
 
-        if (result != CY_RSLT_SUCCESS) {
-            PRINT("Gulp..that wasn't suposed to happen!\r\n");
-            PRINT("Error code: %x\r\n", result);
-            cy_rtos_delay_milliseconds(1000);
+            if (result != CY_RSLT_SUCCESS) {
+                PRINT("Gulp..that wasn't suposed to happen!\r\n");
+                PRINT("Error code: %x\r\n", result);
+                cy_rtos_delay_milliseconds(1000);
+            }
         }
 
 
