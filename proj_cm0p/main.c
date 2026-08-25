@@ -8,7 +8,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
-#include "udp_server.h"
+#include "tcp_server.h"
 #include "qspi_dma.h"
 #include "util.h"
 
@@ -18,8 +18,8 @@
 * Macros
 ********************************************************************************/
 /* RTOS related macros for TCP server task. */
-#define UDP_SERVER_TASK_STACK_SIZE                (1024 * 5 / sizeof(StackType_t))
-#define UDP_SERVER_TASK_PRIORITY                  (2)
+#define SERVER_TASK_STACK_SIZE                (1024 * 5 / sizeof(StackType_t))
+#define SERVER_TASK_PRIORITY                  (2)
 
 #define QSPI_TASK_STACK_SIZE (1024 / sizeof(StackType_t)) // 1 kb
 #define QSPI_TASK_PRIORITY (1)
@@ -39,8 +39,7 @@ cy_queue_t led_command_q;
 volatile int uxTopUsedPriority;
 
 cy_stc_smif_context_t smifContext;
-void SMIF_Interrupt_User(void)
-{
+void SMIF_Interrupt_User(void) {
     Cy_SMIF_Interrupt(SMIF0, &smifContext);
 }
 
@@ -54,10 +53,14 @@ void qspi_task_test(void *arg) {
 void cm0_msg_callback();
 volatile bool msg_flag = false;
 
-TaskHandle_t udp_server_task_handle = NULL;
+TaskHandle_t server_task_handle = NULL;
 
-int main()
-{
+/*
+NOTES:
+- sdhc driver uses interrupt mux 2. don't use this mux number
+- printf disables interrupts but only on the cm0+ for some reason 
+*/
+int main() {
     cy_rslt_t result;
 
 
@@ -86,8 +89,7 @@ int main()
 
     PRINT("-------------------\r\n");
 
-    cy_stc_sysint_t smifIntConfig =
-    {
+    cy_stc_sysint_t smifIntConfig = {
         .intrSrc = NvicMux5_IRQn,
         .cm0pSrc = SMIF_INTERRUPT,
         .intrPriority = SMIF_PRIORITY
@@ -147,8 +149,8 @@ int main()
     PRINT("Enabling CM4 at %x\n", CY_CORTEX_M4_APPL_ADDR);
     Cy_SysEnableCM4(CY_CORTEX_M4_APPL_ADDR);
 
-    xTaskCreate(udp_server_task, "Network task", UDP_SERVER_TASK_STACK_SIZE, &motor_data_ring_buf,
-               UDP_SERVER_TASK_PRIORITY, &udp_server_task_handle);
+    xTaskCreate(tcp_server_task, "Network task", SERVER_TASK_STACK_SIZE, &motor_data_ring_buf,
+               SERVER_TASK_PRIORITY, &server_task_handle);
 
     // IPC communication
     Cy_IPC_Pipe_RegisterCallback(USER_IPC_PIPE_EP_ADDR,
@@ -169,8 +171,7 @@ int main()
 Custom power management callback for CM0+ core which is registered by cybsp_init().
 This avoids conflict with default power management callback registered on CM4 core.
 */
-cy_rslt_t cybsp_register_custom_sysclk_pm_callback(void)
-{
+cy_rslt_t cybsp_register_custom_sysclk_pm_callback(void) {
     cy_rslt_t result = CY_RSLT_SUCCESS;
 
     return result;
@@ -182,19 +183,18 @@ void cm0_msg_callback(uint32_t *msg) {
 
     //PRINT("got\r\n");
     ipc_msg_t *ipc_recv_msg;
-    if (msg != NULL)
-    {
+    if (msg != NULL) {
         ipc_recv_msg = (ipc_msg_t *) msg;
         motor_data_ring_buf.current_entry_ptr++;
         if (motor_data_ring_buf.current_entry_ptr == RING_BUF_ENTRIES) {
             motor_data_ring_buf.current_entry_ptr = 0;
         }
         memcpy(
-            motor_data_ring_buf.data[motor_data_ring_buf.current_entry_ptr],
-            ipc_recv_msg->data,
-            sizeof(motor_data_ring_buf.data[0])
+            &motor_data_ring_buf.packets[motor_data_ring_buf.current_entry_ptr],
+            &ipc_recv_msg->packet,
+            sizeof(motor_data_ring_buf.packets[0])
         );
-        vTaskResume(udp_server_task_handle);
+        vTaskResume(server_task_handle);
     }
     
 }

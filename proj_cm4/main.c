@@ -67,7 +67,7 @@ static ipc_msg_t ipc_msg = {
     .client_id  = IPC_CM4_TO_CM0_CLIENT_ID,
     .cpu_status = 0,
     .intr_mask  = USER_IPC_PIPE_INTR_MASK,
-    .data        = {},
+    .packet        = {},
 };
 
 /* Message variables */
@@ -102,23 +102,29 @@ int main(void)
 
     printf("\x1b[2J\x1b[;H"); // clear screen
 
+    uint32_t packet_idx = 0;
     uint32_t count = 0;
     uint32_t buf_idx = 0;
 
     while (true) {
         ipc_data_prefill_buf[buf_idx] = count;
-        buf_idx++;
+        ipc_data_prefill_buf[buf_idx+1] = count + 1;
+        ipc_data_prefill_buf[buf_idx+2] = count + 2;
+        ipc_data_prefill_buf[buf_idx+3] = count + 3;
+        buf_idx += 4;
+        count += 4;
         if (buf_idx == IPC_DATA_LENGTH) {
-            memcpy(ipc_msg.data, ipc_data_prefill_buf, sizeof(ipc_data_prefill_buf));
-            
+            packet_idx++;
+            memcpy(ipc_msg.packet.data, ipc_data_prefill_buf, sizeof(ipc_data_prefill_buf));
+            //ipc_msg.packet.idx = packet_idx;
+
             Cy_IPC_Pipe_SendMessage(USER_IPC_PIPE_EP_ADDR_CM0, \
                 USER_IPC_PIPE_EP_ADDR_CM4, \
                 (void *) &ipc_msg, 0);   
             buf_idx = 0;
-            //printf("sent\r\n");
+            //printf("sent %d\r\n", count);
         }
-        count++;
-        Cy_SysLib_DelayUs(160);
+        Cy_SysLib_DelayUs(40);
     }
 
 }

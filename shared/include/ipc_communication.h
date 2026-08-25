@@ -103,19 +103,25 @@
 * Enumerations
 *******************************************************************************/
 
-#define IPC_DATA_LENGTH 350 // this fits within 1472 byte limit for UDP packets
-#define RING_BUF_ENTRIES 10
+#define IPC_DATA_LENGTH 344
+#define RING_BUF_ENTRIES 100
+
+typedef struct __attribute__((packed)) {
+    //uint32_t idx;
+    uint32_t data[IPC_DATA_LENGTH];
+} motor_packet_t;
+
 typedef struct __attribute__((packed, aligned(4)))
 {
     uint8_t     client_id;
     uint8_t     cpu_status;
     uint16_t    intr_mask;
-    uint32_t    data[IPC_DATA_LENGTH];
+    motor_packet_t packet;
 } ipc_msg_t ;
 
 typedef struct {
     uint32_t current_entry_ptr;
-    uint32_t data[RING_BUF_ENTRIES][IPC_DATA_LENGTH];
+    motor_packet_t packets[RING_BUF_ENTRIES];
 } motor_data_ring_buf_t;
 
 /*******************************************************************************
