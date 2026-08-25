@@ -104,7 +104,7 @@
 *******************************************************************************/
 
 #define IPC_DATA_LENGTH 344
-#define RING_BUF_ENTRIES 100
+#define RING_BUF_ENTRIES 50
 
 typedef struct __attribute__((packed)) {
     //uint32_t idx;

@@ -15,9 +15,10 @@ my_socket.settimeout(SOCKET_TIMEOUT)
 my_socket.bind((CLIENT_IP_ADDR, CLIENT_PORT))
 my_socket.connect((SERVER_IP_ADDR, SERVER_PORT))
 
-MAX_PACKETS = 25
-DATA_LENGTH = 344
+MAX_PACKETS = 100
+DATA_LENGTH = 344 * 4
 
+my_socket.send(b"START\x00")
 
 if __name__ == "__main__":
 
@@ -25,7 +26,7 @@ if __name__ == "__main__":
     total_packets = 0
 
     try:
-        while True:
+        while total_packets < 10000:
             start_time = time.perf_counter()
             bytes_received = []
             for i in range(MAX_PACKETS):
@@ -55,6 +56,6 @@ if __name__ == "__main__":
             #print(f" { round(len(bytes_received)/total_dur/(1024**2), 2) } MiB/sec")
             #print(f" { round(len(bytes_received)/total_dur/(1024**2) * 8, 2) } Mib/sec")
             #print(f"{drops = }, latest = {sorted_list[-1]}")
-            print(f"drops = {drops}/{round(total_packets)}, ({round(drops/total_packets, 2)}%)")
+            print(f"drops = {drops}/{round(total_packets)}, ({round(drops/total_packets * 100, 2)}%)")
     except KeyboardInterrupt:
         my_socket.close()
