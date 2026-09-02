@@ -97,7 +97,7 @@ int main()
     
     /* SMIF initialization */
     Cy_SMIF_Init(SMIF0, &smif_0_config, TIMEOUT_1_S, &smifContext);
-    Cy_SMIF_SetRxFifoTriggerLevel(SMIF0, 3);
+    Cy_SMIF_SetRxFifoTriggerLevel(SMIF0, 0);
     Cy_SMIF_Enable(SMIF0, &smifContext);
 
     /* \x1b[2J\x1b[;H - ANSI ESC sequence to clear screen. */
@@ -120,7 +120,7 @@ int main()
     cy_en_smif_status_t smif_result = Cy_SMIF_ReceiveData(
         SMIF0,
         NULL, // receiving is handled via DMA
-        sizeof(rx_buf),
+        4,
         CY_SMIF_WIDTH_QUAD,
         NULL,
         &smifContext

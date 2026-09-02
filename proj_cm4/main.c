@@ -125,7 +125,7 @@ int main(void)
        to be added in the CM4 */
     result = cyhal_hwmgr_reserve(&mcwdt_0);
     if (result != CY_RSLT_SUCCESS)
-    {
+    {   
         CY_ASSERT(0);
     }
 
