@@ -97,7 +97,7 @@ int main()
     
     /* SMIF initialization */
     Cy_SMIF_Init(SMIF0, &smif_0_config, TIMEOUT_1_S, &smifContext);
-    Cy_SMIF_SetRxFifoTriggerLevel(SMIF0, 3);
+    Cy_SMIF_SetRxFifoTriggerLevel(SMIF0, 0);
     Cy_SMIF_Enable(SMIF0, &smifContext);
 
     /* \x1b[2J\x1b[;H - ANSI ESC sequence to clear screen. */
