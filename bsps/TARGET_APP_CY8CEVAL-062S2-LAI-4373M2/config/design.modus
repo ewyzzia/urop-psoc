@@ -460,7 +460,7 @@
                         <Param id="CRC_POLYNOMIAL" value="79764919"/>
                         <Param id="CRC_REMINDER_REVERSE" value="false"/>
                         <Param id="CRC_REMINDER_XOR" value="0"/>
-                        <Param id="DATA_TRANSFER_WIDTH_0" value="WordToByte"/>
+                        <Param id="DATA_TRANSFER_WIDTH_0" value="WordToWord"/>
                         <Param id="DESCR_SELECTION" value="0"/>
                         <Param id="ENABLE_CHAINING_0" value="true"/>
                         <Param id="INTR_OUT_0" value="CY_DMA_DESCR"/>
@@ -470,7 +470,7 @@
                         <Param id="TRIG_IN_TYPE_0" value="CY_DMA_1ELEMENT"/>
                         <Param id="TRIG_OUT_TYPE_0" value="CY_DMA_DESCR"/>
                         <Param id="X_DST_INCREMENT_0" value="1"/>
-                        <Param id="X_NUM_OF_ELEMENTS_0" value="4"/>
+                        <Param id="X_NUM_OF_ELEMENTS_0" value="1"/>
                         <Param id="X_SRC_INCREMENT_0" value="0"/>
                         <Param id="Y_DST_INCREMENT_0" value="0"/>
                         <Param id="Y_NUM_OF_ELEMENTS_0" value="1"/>

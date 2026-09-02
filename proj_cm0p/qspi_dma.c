@@ -170,7 +170,7 @@ bool configure_rx_dma(uint32_t* rx_buffer)
     PRINT("one\r\n");
     
     /* Set source and destination for descriptor 1 */
-    Cy_DMA_Descriptor_SetSrcAddress(&rx_dma_Descriptor_0, &SMIF0->RX_DATA_FIFO_RD1);
+    Cy_DMA_Descriptor_SetSrcAddress(&rx_dma_Descriptor_0, &SMIF0->RX_DATA_FIFO_RD4);
     Cy_DMA_Descriptor_SetDstAddress(&rx_dma_Descriptor_0, (uint8_t*) rx_buffer);
     
     PRINT("two\r\n");

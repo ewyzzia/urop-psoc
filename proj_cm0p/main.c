@@ -97,7 +97,7 @@ int main()
     
     /* SMIF initialization */
     Cy_SMIF_Init(SMIF0, &smif_0_config, TIMEOUT_1_S, &smifContext);
-    Cy_SMIF_SetRxFifoTriggerLevel(SMIF0, 0);
+    Cy_SMIF_SetRxFifoTriggerLevel(SMIF0, 3);
     Cy_SMIF_Enable(SMIF0, &smifContext);
 
     /* \x1b[2J\x1b[;H - ANSI ESC sequence to clear screen. */
@@ -106,32 +106,33 @@ int main()
     // try transmitting something
     PRINT("Aight we transmitting\r\n");
 
-    result = Cy_SMIF_TransmitCommand(SMIF0,
-        0xAF,
-        CY_SMIF_WIDTH_QUAD,
-        CY_SMIF_CMD_WITHOUT_PARAM,
-        CY_SMIF_CMD_WITHOUT_PARAM,
-        CY_SMIF_WIDTH_QUAD,
-        CY_SMIF_SLAVE_SELECT_2,
-        false,
-        &smifContext
-    );
+    for (int i = 0; i < 2; i++) {
+        result = Cy_SMIF_TransmitCommand(SMIF0,
+            0xAF,
+            CY_SMIF_WIDTH_QUAD,
+            CY_SMIF_CMD_WITHOUT_PARAM,
+            CY_SMIF_CMD_WITHOUT_PARAM,
+            CY_SMIF_WIDTH_QUAD,
+            CY_SMIF_SLAVE_SELECT_2,
+            false,
+            &smifContext
+        );
 
-    cy_en_smif_status_t smif_result = Cy_SMIF_ReceiveData(
-        SMIF0,
-        NULL, // receiving is handled via DMA
-        4,
-        CY_SMIF_WIDTH_QUAD,
-        NULL,
-        &smifContext
-    );
+        cy_en_smif_status_t smif_result = Cy_SMIF_ReceiveData(
+            SMIF0,
+            NULL, // receiving is handled via DMA
+            sizeof(rx_buf),
+            CY_SMIF_WIDTH_QUAD,
+            NULL,
+            &smifContext
+        );
 
-    while (!rx_dma_done) {}
-    PRINT("Got %08x from FPGA\r\n", rx_buf);
-
-    if (smif_result != CY_SMIF_SUCCESS) {
-        PRINT("Ruh roh...something went wrong 1\r\n");
+        while (!rx_dma_done) {}
+        rx_dma_done = false;
+        PRINT("Got %08x from FPGA\r\n", rx_buf);
+        rx_buf = 0;
     }
+
     PRINT("Transmission transmitted! Wow\r\n");
 
     PRINT("===============================================================\n");
